@@ -30,10 +30,11 @@ class SADLStruct:
 
 
 class SADL(SoundBase):
-    def __init__(self, file: str, id_: int):
+    def __init__(self, file: str, id_: int, print_info: bool = False):
         SoundBase.__init__(self, file, id_, "SADL", "vgmstream", True)
         self.sadl = SADLStruct()
         self._ignore_loop = True
+        self._print_info = print_info
 
     def read_file(self) -> bytearray:
         br = BinaryReader(open(self._sound_file, "rb"))
@@ -46,7 +47,7 @@ class SADL(SoundBase):
 
         coding = br.read_byte()
         self.sadl.coding = coding & 0xf0
-        print("SADL coding: {}".format(self.sadl.coding))
+        self.log("SADL coding: {}".format(self.sadl.coding))
 
         if coding & 0x06 == 4:
             self.sadl.sample_rate = 32728
@@ -147,11 +148,11 @@ class SADL(SoundBase):
 
         samples_written = I32(0)
 
-        print("")
+        self.log("")
 
         while samples_written < self.number_samples:
-            sys.stdout.write("\r{}/{} {:.2f}%".format(samples_written, self.number_samples,
-                                                     int(samples_written) / int(self.number_samples) * 100))
+            self.log("\r{}/{} {:.2f}%".format(samples_written, self.number_samples,
+                                              int(samples_written) / int(self.number_samples) * 100), terminator='')
             samples_to_do = I32(30)
             if samples_written + samples_to_do > self.number_samples:
                 samples_to_do = self._total_samples - samples_written
@@ -233,3 +234,7 @@ class SADL(SoundBase):
 
         br.close()
         bw.close()
+
+    def log(self, msg, terminator='\n'):
+        if self._print_info:
+            sys.stdout.write(msg + terminator)
