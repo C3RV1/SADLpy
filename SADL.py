@@ -168,6 +168,8 @@ class SADL(SoundBase):
 
             samples_written += samples_to_do
 
+        self.log("")
+
         if self._channels == 1:
             mus = buffer[0]
         else:
