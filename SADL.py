@@ -6,6 +6,8 @@ from binaryedit.binwriter import *
 from Compression.IMA_ADPCM import ImaAdpcm
 from Compression.Procyon import Procyon
 from Helper import Helper
+from cint.cint import I32
+import sys
 
 
 class Coding:
@@ -31,6 +33,7 @@ class SADL(SoundBase):
     def __init__(self, file: str, id_: int):
         SoundBase.__init__(self, file, id_, "SADL", "vgmstream", True)
         self.sadl = SADLStruct()
+        self._ignore_loop = True
 
     def read_file(self) -> bytearray:
         br = BinaryReader(open(self._sound_file, "rb"))
@@ -46,27 +49,27 @@ class SADL(SoundBase):
         print("SADL coding: {}".format(self.sadl.coding))
 
         if coding & 0x06 == 4:
-            self.sadl._sample_rate = 32728
+            self.sadl.sample_rate = 32728
         elif coding & 0x06 == 2:
-            self.sadl._sample_rate = 16364
+            self.sadl.sample_rate = 16364
 
         br.seek(0x40)
         self.sadl.file_size = br.read_uint32()
 
-        start_offset = 0x10
+        start_offset = 0x100
         if self.sadl.coding == Coding.INT_IMA:
-            self.sadl.num_samples = (self.sadl.file_size - start_offset) / self.sadl.channel * 2
+            self.sadl.num_samples = int((self.sadl.file_size - start_offset) / self.sadl.channel * 2)
         elif self.sadl.coding == Coding.NDS_PROCYON:
-            self.sadl.num_samples = (self.sadl.file_size - start_offset) / self.sadl.channel / 16 * 30
+            self.sadl.num_samples = int((self.sadl.file_size - start_offset) / self.sadl.channel / 16 * 30)
 
         self.sadl.interleave_block_size = 0x10
 
         br.seek(0x54)
         if self.sadl.loop_flag != 0:
             if self.sadl.coding == Coding.INT_IMA:
-                self.sadl.loop_offset = (br.read_uint32() - start_offset) / self.sadl.channel * 2
+                self.sadl.loop_offset = int((br.read_uint32() - start_offset) / self.sadl.channel * 2)
             elif self.sadl.coding == Coding.NDS_PROCYON:
-                self.sadl.loop_offset = (br.read_uint32() - start_offset) / self.sadl.channel / 16 * 30
+                self.sadl.loop_offset = int((br.read_uint32() - start_offset) / self.sadl.channel / 16 * 30)
 
         self._total_samples = self.sadl.num_samples
         self._sample_rate = self.sadl.sample_rate
@@ -89,7 +92,7 @@ class SADL(SoundBase):
         if self.sadl.coding == Coding.NDS_PROCYON:
             return self.decode_procyon(encoded)
 
-        start_offset = 0x100
+        start_offset = I32(0x100)
         pos = 0
 
         if not self._loop_enabled:
@@ -129,7 +132,7 @@ class SADL(SoundBase):
         return data
 
     def decode_procyon(self, encoded: bytearray) -> bytearray:
-        start_offset = 0x100
+        start_offset = I32(0x100)
 
         buffer = []
         hist = []
@@ -139,23 +142,28 @@ class SADL(SoundBase):
         for i in range(0, self._channels):
             offset.append(start_offset + self._block_size * i)
             buffer.append(bytearray())
-            length.append(0)
-            hist.append([0, 0])
+            length.append(I32(0))
+            hist.append([I32(0), I32(0)])
 
-        samples_written = 0
-        samples_to_do = 0
+        samples_written = I32(0)
+
+        print("")
 
         while samples_written < self.number_samples:
-            samples_to_do = 30
+            sys.stdout.write("\r{}/{} {:.2f}%".format(samples_written, self.number_samples,
+                                                     int(samples_written) / int(self.number_samples) * 100))
+            samples_to_do = I32(30)
             if samples_written + samples_to_do > self.number_samples:
                 samples_to_do = self._total_samples - samples_written
 
             for chan in range(0, self._channels):
-                buffer[chan], hist[chan] = Procyon.decode(encoded, offset[chan],
-                                                          samples_to_do, self._channels, hist[chan])
-                length[chan] += len(buffer[chan])
+                temp = Procyon.decode(encoded, offset[chan],
+                                      samples_to_do, self._channels, hist[chan])
 
-                offset[chan] += self._block_size * self._channels
+                buffer[chan].extend(temp)
+                length[chan] += len(temp)
+
+                offset[chan] += int(self._block_size * self._channels)
 
             samples_written += samples_to_do
 
