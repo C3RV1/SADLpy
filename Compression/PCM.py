@@ -5,12 +5,24 @@ import struct
 
 class BitConverter:
     @staticmethod
-    def to_int_16(bytearray_: bytearray, b: int) -> int:
-        return struct.unpack("h", bytearray_[b:b+2])[0]
+    def to_int_16(bytearray_: bytearray, b: int, endian="<") -> int:
+        return struct.unpack(endian + "h", bytearray_[b:b+2])[0]
 
     @staticmethod
-    def get_bytearray(short) -> bytearray:
-        return bytearray(struct.pack("h", short))
+    def get_bytes_short(short, endian="<") -> bytearray:
+        return bytearray(struct.pack(endian + "h", short))
+
+    @staticmethod
+    def from_bytes_short(short_bytearray, endian="<") -> int:
+        return struct.unpack(endian + "h", short_bytearray)[0]
+
+    @staticmethod
+    def get_bytes_byte(byte, endian="<") -> bytearray:
+        return bytearray(struct.pack(endian + "b", byte))
+
+    @staticmethod
+    def from_bytes_byte(short_bytearray, endian="<") -> int:
+        return struct.unpack(endian + "b", short_bytearray)[0]
 
 
 class PCM:
@@ -26,7 +38,7 @@ class PCM:
             if sample >> 7 != 0:
                 pcm16 -= 0x7fff
 
-            results += BitConverter.get_bytearray(pcm16)
+            results += BitConverter.get_bytes_short(pcm16)
 
         return results
 
@@ -41,7 +53,7 @@ class PCM:
             pcm16 <<= 8
             pcm16 += 0x7fff
 
-            results += BitConverter.get_bytearray(pcm16)
+            results += BitConverter.get_bytes_short(pcm16)
 
         return results
 
@@ -66,6 +78,6 @@ class PCM:
         results = bytearray()
 
         for i in range(0, len(data)):
-            results += BitConverter.get_bytearray(data[i])
+            results += BitConverter.get_bytes_short(data[i])
 
         return results
